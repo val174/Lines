@@ -62,7 +62,8 @@ LinesMonoGame/
 ├── tests/                     — тесты
 │   └── LogicLines.Tests/          — юнит-тесты: логика, сервисы настроек/рекордов/сейвов, локализация
 ├── docs/                      — документация
-│   └── code-review.md           — результаты код-ревью и план исправлений (ветка feature/code-review)
+│   ├── code-review.md           — результаты код-ревью и план исправлений (ветка feature/code-review)
+│   └── leaderboard-online.md    — план онлайн-доски лидеров (пока только план)
 ├── .github/workflows/build.yml — CI для ПУБЛИЧНОГО репозитория GitHub (пути в нём
 │                                — от корня публичного репо = содержимое LinesMonoGame/):
 │                                тесты + сборка установщика/portable/APK + Web на Pages

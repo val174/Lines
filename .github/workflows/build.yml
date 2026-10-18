@@ -6,6 +6,8 @@ name: Build & Publish
 on:
   push:
     branches: [main]
+    # релизные теги: git tag v1.0.0 && git push origin v1.0.0
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
@@ -103,3 +105,25 @@ jobs:
     steps:
       - uses: actions/deploy-pages@v4
         id: deployment
+
+  # Релиз на GitHub: только по тегу v* (по пушам в main не создаётся).
+  # Берёт артефакты jobs windows/android этого же прогона.
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # создание релиза и загрузка файлов
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - uses: softprops/action-gh-release@v2
+        with:
+          # имя релиза = тег (v1.0.0), заметки - автогенерация по коммитам
+          generate_release_notes: true
+          files: |
+            artifacts/windows/LinesSetup-*.exe
+            artifacts/windows/Lines.exe
+            artifacts/android/*.apk
+            artifacts/android/*.aab

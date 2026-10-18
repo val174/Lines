@@ -57,9 +57,17 @@ powershell -File build/publish-web.ps1       # статический сайт
 ## CI / публикация
 
 GitHub Actions (`.github/workflows/build.yml`) при пуше в `main`:
-прогоняет тесты, собирает установщик, portable, APK и Web-версию,
+прогоняет тесты, собирает установщик, portable, APK/AAB и Web-версию,
 публикует Web на GitHub Pages. Артефакты Windows/Android доступны
-в разделе Artifacts соответствующего workflow run.
+в разделе Artifacts соответствующего workflow run (хранятся 30 дней).
+
+По релизному тегу `v*` дополнительно создаётся GitHub Release
+с файлами для скачивания (установщик, portable, APK, AAB):
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
 
 ## Лицензия
 
