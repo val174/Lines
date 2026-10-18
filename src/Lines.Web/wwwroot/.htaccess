@@ -1,0 +1,23 @@
+# MIME-типы Blazor WebAssembly (без application/wasm игра не загрузится)
+AddType application/wasm .wasm
+AddType application/octet-stream .dll .dat
+AddType application/json .json .blat
+AddType text/javascript .js
+AddType text/css .css
+
+# Кэширование статики
+<IfModule mod_headers.c>
+    # хэшированные ассеты (dll/wasm/xnb иконки) - долгий кэш
+    <FilesMatch "\.(wasm|dll|dat|xnb|css|png|ico)$">
+        Header set Cache-Control "public, max-age=86400"
+    </FilesMatch>
+    # service worker и точка входа - без кэша: браузер должен видеть
+    # новую версию service-worker.js сразу, иначе после обновления
+    # публикации до суток отдаётся старый офлайн-кэш
+    <FilesMatch "^(service-worker|service-worker-assets)\.js$">
+        Header set Cache-Control "no-cache"
+    </FilesMatch>
+    <FilesMatch "^(index\.html|manifest\.webmanifest)$">
+        Header set Cache-Control "no-cache"
+    </FilesMatch>
+</IfModule>

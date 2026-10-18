@@ -1,0 +1,60 @@
+
+#----------------------------- Global Properties ----------------------------#
+
+/outputDir:bin/$(Platform)
+/intermediateDir:obj/$(Platform)
+/platform:Windows
+/config:
+/profile:Reach
+/compress:False
+
+#-------------------------------- References --------------------------------#
+
+
+#---------------------------------- Content ---------------------------------#
+
+# В MGCB 3.8.5 обёртка /begin: не нужна - importer/processor задаются перед /build
+/importer:FontDescriptionImporter
+/processor:FontDescriptionProcessor
+/processorParam:PremultiplyAlpha=True
+/processorParam:TextureFormat=Compressed
+/build:MainFont.spritefont
+/build:MainFont64.spritefont
+/build:MainFont128.spritefont
+
+# Картинка заставки (генерируется build/generate-splash.py)
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:PremultiplyAlpha=True
+/build:splash.png
+
+# Персонажи пьедесталов (обрабатываются build/process-kings.py
+# из build/assets-src/)
+/build:king_player.png
+/build:king_leader.png
+
+# Шарики игрового поля (генерируются build/generate-balls.py)
+/build:Balls/ball_1.png
+/build:Balls/ball_2.png
+/build:Balls/ball_3.png
+/build:Balls/ball_4.png
+/build:Balls/ball_5.png
+/build:Balls/ball_6.png
+
+# Иконки кнопок (генерируются build/generate-buttons.py)
+/build:Buttons/btn_new_game.png
+/build:Buttons/btn_save.png
+/build:Buttons/btn_load.png
+/build:Buttons/btn_settings.png
+/build:Buttons/btn_records.png
+/build:Buttons/btn_exit.png
+
+# Звуковые эффекты (генерируются build/generate-sounds.py)
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/build:Sounds/select.wav
+/build:Sounds/move.wav
+/build:Sounds/strip.wav
+/build:Sounds/appear.wav
+/build:Sounds/gameover.wav
+

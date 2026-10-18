@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- annotations, а не enable: подключаемые shared-файлы (Settings,
+         Strings) писались без nullable-аннотаций и в режиме enable
+         засоряют сборку предупреждениями -->
+    <Nullable>annotations</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\LogicLines\LogicLines.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- shared-код без зависимостей от MonoGame: сервисы настроек/
+         сейвов/рекордов (Settings) и локализация (Strings). Весь
+         projitems импортировать нельзя - он тянет экраны и MonoGame -->
+    <Compile Include="..\..\src\Lines.Shared\Settings\*.cs" />
+    <Compile Include="..\..\src\Lines.Shared\Localization\Strings.cs" />
+  </ItemGroup>
+
+</Project>

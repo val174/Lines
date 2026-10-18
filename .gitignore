@@ -1,0 +1,75 @@
+## .NET / Visual Studio
+bin/
+obj/
+out/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio
+.vs/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+
+# Rider
+*.DotSettings.user
+
+# Build results
+[Dd]ebugPublic/
+[Rr]eleases/
+[Bb]uild/
+![Bb]uild/
+![Bb]uild/**
+# артефакты релизной публикации не коммитим
+build/out/
+artifacts/
+publish/
+
+# NuGet
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+
+# MSTest / Test Results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.VisualState.xml
+TestResult.xml
+nunit-*.xml
+coverage*.json
+coverage*.xml
+coverage*.info
+
+# MonoGame / MGCB
+**/Content/bin/
+**/Content/obj/
+**/.mgstats
+
+# OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# Runtime data (результаты игры, настройки)
+result.json
+settings.json
+src/Lines.Web/Content/Balls/
+src/Lines.Web/Content/Buttons/
+src/Lines.Web/Content/Sounds/
+src/Lines.Web/Content/*.png
+src/Lines.Web/Content/*.spritefont
+src/Lines.Web/wwwroot/Content/

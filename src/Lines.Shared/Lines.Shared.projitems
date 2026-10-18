@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <MSBuildAllProjects>$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <SharedGUID>6efba8a9-a407-4029-bdd0-651d22a87386</SharedGUID>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration">
+    <Import_RootNamespace>Lines.Shared</Import_RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)LinesGame.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Input\PointerInput.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Localization\Strings.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Input\ITextSource.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Input\INamePrompter.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Rendering\BallRenderer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Rendering\BoardLayout.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Rendering\BoardRenderer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Rendering\FontSet.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Rendering\HudRenderer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Rendering\PedestalRenderer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Rendering\UiTheme.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Screens\GameScreen.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Screens\GameOverOverlay.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Screens\IScreen.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Screens\OverlayDialogs.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Screens\ScreenManager.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Screens\SplashScreen.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Screens\SettingsScreen.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Screens\SavesScreen.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Screens\RelativeTime.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Settings\GameSettings.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Settings\IKeyValueStore.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Settings\SettingsService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Settings\ResultEntry.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Settings\ResultsService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Settings\GameSave.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Settings\SavesService.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="$(MSBuildThisFileDirectory)Content\" />
+    <Folder Include="$(MSBuildThisFileDirectory)Input\" />
+    <Folder Include="$(MSBuildThisFileDirectory)Rendering\" />
+    <Folder Include="$(MSBuildThisFileDirectory)Screens\" />
+    <Folder Include="$(MSBuildThisFileDirectory)Settings\" />
+  </ItemGroup>
+  <ItemGroup>
+    <MonoGameContentReference Include="$(MSBuildThisFileDirectory)Content\Content.mgcb" />
+    <None Include="$(MSBuildThisFileDirectory)Content\Content.mgcb" />
+    <None Include="$(MSBuildThisFileDirectory)Content\MainFont.spritefont" />
+    <None Include="$(MSBuildThisFileDirectory)Content\MainFont64.spritefont" />
+    <None Include="$(MSBuildThisFileDirectory)Content\MainFont128.spritefont" />
+    <None Include="$(MSBuildThisFileDirectory)Content\splash.png" />
+    <None Include="$(MSBuildThisFileDirectory)Content\Sounds\select.wav" />
+    <None Include="$(MSBuildThisFileDirectory)Content\Sounds\move.wav" />
+    <None Include="$(MSBuildThisFileDirectory)Content\Sounds\strip.wav" />
+    <None Include="$(MSBuildThisFileDirectory)Content\Sounds\appear.wav" />
+    <None Include="$(MSBuildThisFileDirectory)Content\Sounds\gameover.wav" />
+  </ItemGroup>
+ </Project>

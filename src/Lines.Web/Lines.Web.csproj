@@ -1,0 +1,73 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>Lines.Web</RootNamespace>
+    <AssemblyName>Lines.Web</AssemblyName>
+    <DefineConstants>$(DefineConstants);BLAZORGL</DefineConstants>
+    <KniPlatform>BlazorGL</KniPlatform>
+    <Version>1.0.0</Version>
+    <InformationalVersion>1.0.0</InformationalVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <BlazorEnableTimeZoneSupport>false</BlazorEnableTimeZoneSupport>
+    <!-- PWA: генерация service-worker-assets.js (список ассетов с хэшами
+         для офлайн-кэша service-worker.js) при публикации -->
+    <ServiceWorkerAssetsManifest>service-worker-assets.js</ServiceWorkerAssetsManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Pages\Index.razor.cs" />
+    <Compile Include="Program.cs" />
+    <Compile Include="LocalStorageStore.cs" />
+    <Compile Include="JsNamePrompter.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="nkast.Xna.Framework" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Content" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Graphics" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Audio" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Media" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Input" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Game" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Devices" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Storage" Version="4.2.9001" />
+    <PackageReference Include="nkast.Kni.Platform.Blazor.GL" Version="4.2.9001.2" />
+    <PackageReference Include="nkast.Xna.Framework.Content.Pipeline.Builder" Version="4.2.9001" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.29" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="8.0.29" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\LogicLines\LogicLines.csproj" />
+  </ItemGroup>
+
+  <!-- Контент общий (Lines.Shared/Content), но для Web собирается
+       отдельным манифестом с /platform:BlazorGL; ассеты копируются
+       сюда перед сборкой (MGCB не умеет /build с относительными путями
+       вне своей папки) -->
+  <ItemGroup>
+    <KniContentReference Include="Content\Content.Web.mgcb" />
+  </ItemGroup>
+
+  <Target Name="CopySharedContent" BeforeTargets="RunContentBuilder">
+    <ItemGroup>
+      <SharedContentAsset Include="..\Lines.Shared\Content\**\*.png;..\Lines.Shared\Content\**\*.wav;..\Lines.Shared\Content\**\*.spritefont" />
+    </ItemGroup>
+    <Copy SourceFiles="@(SharedContentAsset)" DestinationFolder="Content\%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <ItemGroup>
+    <!-- PWA: в разработке используется пустой service-worker.js,
+         при публикации - service-worker.published.js (офлайн-кэш) +
+         генерируется service-worker-assets.js -->
+    <ServiceWorker Include="wwwroot\service-worker.js" PublishedContent="wwwroot\service-worker.published.js" />
+  </ItemGroup>
+
+  <Import Project="..\Lines.Shared\Lines.Shared.projitems" Label="Shared" />
+</Project>

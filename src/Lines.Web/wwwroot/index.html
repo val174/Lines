@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Шарики</title>
+    <base href="./" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <meta name="theme-color" content="#242428" />
+    <link rel="apple-touch-icon" href="icon-192.png" />
+    <link rel="icon" type="image/png" href="icon-192.png" />
+    <link href="css/app.css" rel="stylesheet" />
+    <link href="Lines.Web.styles.css" rel="stylesheet" />
+</head>
+
+<body>
+
+    <div id="app">
+        <div id="loading" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width:100vw; height:100vh; background: #242428; font-family: 'Segoe UI', sans-serif;">
+            <div style="color: #e8b93c; font-size: 3em; letter-spacing: 0.05em;">Шарики</div>
+            <div style="width: 36px; height: 36px; margin-top: 24px; border: 4px solid #55565e; border-top-color: #e8b93c; border-radius: 50%; animation: lines-spin 0.9s linear infinite;"></div>
+        </div>
+        <style>@keyframes lines-spin { to { transform: rotate(360deg); } }</style>
+    </div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss">x</a>
+    </div>
+
+    <script src="_framework/blazor.webassembly.js" autostart="false"></script>
+    <script type="module">
+        import { BrotliDecode } from './js/decode.min.js';
+        window.BrotliDecode = BrotliDecode;
+        // Set this to enable Brotli (.br) decompression on static webServers
+        // that don't support content compression and http://.
+        var enableBrotliDecompression = false;
+        Blazor.start({
+            loadBootResource: function (type, name, defaultUri, integrity)
+            {
+                if (enableBrotliDecompression === true && type !== 'dotnetjs' && location.hostname !== 'localhost')
+                {
+                    return (async function()
+                    {
+                        const response = await fetch(defaultUri + '.br', { cache: 'no-cache' });
+                        if (!response.ok)
+                            throw new Error(response.statusText);
+                        const originalResponseBuffer = await response.arrayBuffer();
+                        const originalResponseArray = new Int8Array(originalResponseBuffer);
+                        const contentType = (type === 'dotnetwasm')
+                                          ? 'application/wasm'
+                                          : 'application/octet-stream';
+                        const decompressedResponseArray = BrotliDecode(originalResponseArray);
+                        return new Response(decompressedResponseArray,
+                                            { headers: { 'content-type': contentType }
+                                   });
+                    })();
+                }
+            }
+        });
+    </script>
+
+    <script src="_content/nkast.Wasm.JSInterop/js/JSObject.8.0.11.js"></script>
+    <script src="_content/nkast.Wasm.Dom/js/Window.8.0.11.js"></script>
+    <script src="_content/nkast.Wasm.Dom/js/Document.8.0.11.js"></script>
+    <script src="_content/nkast.Wasm.Dom/js/Navigator.8.0.11.js"></script>
+    <script src="_content/nkast.Wasm.Dom/js/Gamepad.8.0.11.js"></script>
+    <script src="_content/nkast.Wasm.Dom/js/Media.8.0.11.js"></script>
+    <script src="_content/nkast.Wasm.XHR/js/XHR.8.0.11.js"></script>
+    <script src="_content/nkast.Wasm.Canvas/js/Canvas.8.0.11.js"></script>
+    <script src="_content/nkast.Wasm.Canvas/js/CanvasGLContext.8.0.11.js"></script>
+    <script src="_content/nkast.Wasm.Audio/js/Audio.8.0.11.js"></script>
+    <script src="_content/nkast.Wasm.XR/js/XR.8.0.11.js"></script>
+
+    <script>
+        // диагностика: последняя JS/WASM-ошибка дублируется в DOM (#jsError),
+        // т.к. консоль браузера не всегда доступна
+        function showJsError(text)
+        {
+            var d = document.getElementById('jsError');
+            if (!d)
+            {
+                d = document.createElement('pre');
+                d.id = 'jsError';
+                d.style.cssText = 'position:fixed;top:0;left:0;z-index:2000;background:#300;color:#fdd;padding:8px;max-width:100vw;white-space:pre-wrap;';
+                document.body.appendChild(d);
+            }
+            d.textContent = text;
+        }
+        window.addEventListener('error', function(e)
+        {
+            showJsError(e.message + '\n' + ((e.error && e.error.stack) || ''));
+        });
+        window.addEventListener('unhandledrejection', function(e)
+        {
+            showJsError(String((e.reason && (e.reason.stack || e.reason.message)) || e.reason));
+        });
+
+        function tickJS()
+        {
+            try
+            {
+                window.theInstance.invokeMethod('TickDotNet');
+                window.requestAnimationFrame(tickJS);
+            }
+            catch (err)
+            {
+                showJsError(String((err && (err.stack || err.message)) || err));
+            }
+        }
+
+        window.initRenderJS = (instance) =>
+        {
+            window.theInstance = instance;
+
+            // set initial canvas size
+            var canvas = document.getElementById('theCanvas');
+            var holder = document.getElementById('canvasHolder');
+            canvas.width = holder.clientWidth;
+            canvas.height = holder.clientHeight;
+            // disable context menu on right click
+            canvas.addEventListener("contextmenu", e => e.preventDefault());
+
+            // begin game loop
+            window.requestAnimationFrame(tickJS);
+        };
+
+        window.addEventListener("keydown", function(event)
+        {
+            // Prevent Arrows Keys and Spacebar scrolling the outer page
+            // when running inside an iframe. e.g: itch.io embedding.
+            if ([32, 37, 38, 39, 40].indexOf(event.keyCode) > -1)
+                event.preventDefault();
+        });
+        window.addEventListener("wheel", function(event)
+        {
+            // Prevent Mousewheel scrolling the outer page
+            // when running inside an iframe. e.g: itch.io embedding.
+            event.preventDefault();
+        }, { passive: false });
+    </script>
+    <script>
+        // PWA: регистрация service worker (офлайн-режим). Работает только
+        // по HTTPS или на localhost; на localhost кэш выключен внутри
+        // самого service-worker.js.
+        if ('serviceWorker' in navigator)
+        {
+            navigator.serviceWorker.register('service-worker.js')
+                .catch(err => console.warn('SW registration failed', err));
+        }
+    </script>
+</body>
+
+</html>

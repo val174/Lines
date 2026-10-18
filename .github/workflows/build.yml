@@ -1,0 +1,105 @@
+# CI + публикация: тесты, сборка всех артефактов и Web на GitHub Pages.
+# Пути в этом файле - относительно КОРНЯ ПУБЛИЧНОГО репозитория
+# (его содержимое = содержимое LinesMonoGame/ локального репозитория).
+name: Build & Publish
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Pages: один деплой за раз, новые пуши не отменяют идущий
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      # фуззер идёт ~5-7 минут - это нормально
+      - run: dotnet test tests/LogicLines.Tests/ -c Release
+
+  windows:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Inno Setup
+        run: choco install innosetup --no-progress -y
+      - name: Установщик + portable
+        shell: pwsh
+        run: |
+          build/build-installer.ps1
+          build/publish-portable.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            build/out/LinesSetup-*.exe
+            build/out/portable/Lines.exe
+          retention-days: 30
+
+  android:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+      - name: Android workload
+        run: dotnet workload install android
+      # ANDROID_HOME на windows-latest уже установлен (Android SDK в образе);
+      # APK подписывается отладочным ключом шаблона, секреты не нужны.
+      # Для релизной подписи: keystore в GitHub Secrets + параметры
+      # AndroidSigningKeyStore/... (см. шапку build/publish-android.ps1).
+      - name: APK/AAB
+        shell: pwsh
+        run: build/publish-android.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: |
+            build/out/android/*.apk
+            build/out/android/*.aab
+          retention-days: 30
+
+  web:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Публикация статического сайта
+        shell: pwsh
+        run: build/publish-web.ps1
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/out/web/wwwroot
+
+  deploy:
+    needs: web
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment
