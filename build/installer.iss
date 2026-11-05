@@ -6,8 +6,8 @@
 ; установщиком не трогаются.
 
 #define AppName "Шарики"
-#define AppVersion "1.0.0"
-#define AppPublisher "Val + Kimi"
+#define AppVersion "1.1.0"
+#define AppPublisher "V.Alekhnovich"
 #define AppExe "Lines.Windows.exe"
 
 [Setup]

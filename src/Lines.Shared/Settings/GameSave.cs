@@ -13,5 +13,15 @@ namespace Lines.Shared.Settings
         public int[] NextBalls { get; set; } = new int[9]; // x,y,color * 3
         public int Score { get; set; }
         public string Date { get; set; } = "";
+
+        // отмена хода: снимок состояния перед последним завершённым
+        // ходом и счётчик отмен. Поля опциональны: у старых сохранений
+        // их нет (null/0) - отмена в такой партии недоступна до первого
+        // нового хода
+        public int UndoCount { get; set; }
+        public int[] UndoBalls { get; set; }     // построчно, как Balls; null - снимка нет
+        public int[] UndoNextBalls { get; set; } // тройки x,y,color; null - снимка нет
+        public int UndoScore { get; set; }       // счёт в снимке (до хода и до штрафа)
+        public bool UndoUsed { get; set; }       // снимок уже отменён (до нового хода)
     }
 }

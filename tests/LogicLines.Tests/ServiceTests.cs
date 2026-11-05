@@ -118,20 +118,34 @@ namespace LogicLines.Tests
         }
 
         [Fact]
-        public void Add_SameName_KeepsBestScore()
+        public void Add_SameName_DuplicatesAllowed()
         {
             var svc = new ResultsService(new MemoryKeyValueStore());
 
             svc.Add("Bob", 10);
-            int index = svc.Add("bob", 20); // имя без учёта регистра
+            int index = svc.Add("Bob", 20);
 
-            Assert.Single(svc.Entries);
+            // одинаковые имена допускаются: обе записи в топе,
+            // отсортированы по убыванию, подсвечена новая
+            Assert.Equal(2, svc.Entries.Count);
             Assert.Equal(20, svc.Entries[0].Score);
+            Assert.Equal(10, svc.Entries[1].Score);
             Assert.Equal(0, index);
+        }
 
-            svc.Add("BOB", 5); // худший результат не затирает лучший
-            Assert.Single(svc.Entries);
-            Assert.Equal(20, svc.Entries[0].Score);
+        [Fact]
+        public void Add_BelowTop_ReturnsMinusOne()
+        {
+            var svc = new ResultsService(new MemoryKeyValueStore());
+
+            for (int i = 1; i <= 10; i++)
+                svc.Add("P" + i, i * 10); // топ полный, минимум 10
+
+            int index = svc.Add("Bob", 5); // ниже порога
+
+            Assert.Equal(-1, index);
+            Assert.Equal(10, svc.Entries.Count);
+            Assert.DoesNotContain(svc.Entries, e => e.Name == "Bob");
         }
 
         [Fact]

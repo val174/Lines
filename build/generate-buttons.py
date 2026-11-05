@@ -185,6 +185,7 @@ STEEL = ((203, 213, 225, 255), (100, 116, 139, 255))
 GOLD = ((250, 204, 21, 255), (202, 138, 4, 255))
 RED = ((248, 113, 113, 255), (185, 28, 28, 255))
 
+# btn_undo генерируется отдельно из SVG (build/adapt-undo-icon.py)
 ICONS = [
     ("btn_new_game", g_plus, GREEN),
     ("btn_save", g_save, BLUE),

@@ -35,6 +35,7 @@ namespace Lines.Shared.Localization
 
         // нижняя панель и общие кнопки
         public virtual string NewGame => "New game";
+        public virtual string Undo => "Undo";
         public virtual string Save => "Save";
         public virtual string Load => "Load";
         public virtual string Settings => "Settings";
@@ -67,6 +68,8 @@ namespace Lines.Shared.Localization
         public virtual string EnterNamePrompt => "Enter your name:";
         public virtual string ClickForNewGame => "Click to start a new game";
         public virtual string ClickToReturn => "Click to return";
+        // итог не попал в топ-10: {0} - счёт последней строки (порог)
+        public virtual string NotInTopFormat => "Not in the top 10 - beat {0}!";
 
         // первый запуск
         public virtual string Welcome => "Welcome!";
@@ -78,7 +81,8 @@ namespace Lines.Shared.Localization
         public virtual string ExitConfirmPrompt => "Exit the game?";
 
         // экран сохранённых игр
-        public virtual string SavedGames => "Saved games";
+        public virtual string SaveTitle => "Save";   // заголовок в режиме сохранения
+        public virtual string LoadTitle => "Load";   // заголовок в режиме загрузки
         public virtual string EmptySlot => "Empty";
         public virtual string OverwritePrompt => "Overwrite?";
         public virtual string AutoWatermark => "AUTO";
@@ -109,6 +113,7 @@ namespace Lines.Shared.Localization
         public override string Contender => "Претендент";
 
         public override string NewGame => "Новая игра";
+        public override string Undo => "Отменить";
         public override string Save => "Сохранить";
         public override string Load => "Загрузить";
         public override string Settings => "Настройки";
@@ -139,6 +144,7 @@ namespace Lines.Shared.Localization
         public override string EnterNamePrompt => "Введите имя:";
         public override string ClickForNewGame => "Нажмите для новой игры";
         public override string ClickToReturn => "Нажмите для возврата";
+        public override string NotInTopFormat => "Не попал в топ-10 - обыграйте {0}!";
 
         public override string Welcome => "Добро пожаловать!";
         public override string AskName => "Как вас зовут?";
@@ -147,7 +153,8 @@ namespace Lines.Shared.Localization
         public override string NewGamePrompt => "Начать новую игру?";
         public override string ExitConfirmPrompt => "Выйти из игры?";
 
-        public override string SavedGames => "Сохранённые игры";
+        public override string SaveTitle => "Сохранение";
+        public override string LoadTitle => "Загрузка";
         public override string EmptySlot => "Пусто";
         public override string OverwritePrompt => "Перезаписать?";
         public override string AutoWatermark => "АВТО";

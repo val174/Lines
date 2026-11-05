@@ -43,6 +43,7 @@
 
 # Иконки кнопок (генерируются build/generate-buttons.py)
 /build:Buttons/btn_new_game.png
+/build:Buttons/btn_undo.png
 /build:Buttons/btn_save.png
 /build:Buttons/btn_load.png
 /build:Buttons/btn_settings.png

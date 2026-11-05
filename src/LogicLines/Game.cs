@@ -41,6 +41,9 @@ namespace LogicLines
         {
             Score = 0;
             status = Status.init;
+            snapshot = null;
+            snapshotUsed = false;
+            UndoCount = 0;
         }
 
         // поле заполнено - конец игры (для UI)
@@ -75,12 +78,50 @@ namespace LogicLines
         // перестраивается по полю, анимационное состояние сбрасывается
         public void Restore(int[,] savedMap, Ball[] savedBalls, int score)
         {
+            snapshot = null;
+            snapshotUsed = false;
+            UndoCount = 0;
+            ApplyState(savedMap, savedBalls, score);
+        }
+
+        // восстановление состояния отмены из сохранения (вызывать после
+        // Restore): снимок последнего хода, признак использования и
+        // счётчик отмен; повреждённые данные отбрасываются
+        public void RestoreUndoState(int[,] snapMap, Ball[] snapBalls, int snapScore,
+            bool used, int undoCount)
+        {
+            UndoCount = Math.Max(0, undoCount);
+            if (snapMap == null || snapBalls == null)
+                return;
+
+            int[,] m = new int[Map_size, Map_size];
+            for (int x = 0; x < Map_size; x++)
+                for (int y = 0; y < Map_size; y++)
+                    m[x, y] = Math.Clamp(snapMap[x, y], -1, max_colors);
+
+            var nb = new Ball[3];
+            for (int i = 0; i < 3; i++)
+            {
+                nb[i] = snapBalls[i];
+                if (nb[i].x < -1 || nb[i].x >= Map_size ||
+                    nb[i].y < 0 || nb[i].y >= Map_size ||
+                    nb[i].color < 1 || nb[i].color > max_colors)
+                    nb[i].x = -1;
+            }
+
+            snapshot = new MoveSnapshot(m, nb, Math.Max(0, snapScore));
+            snapshotUsed = used;
+        }
+
+        // откат к снимку: поле/шарики/счёт и полный перерендер через Show
+        private void ApplyState(int[,] stateMap, Ball[] stateBalls, int score)
+        {
             free_fields = new List<FieldAddress>(Map_size * Map_size);
 
             for (int x = 0; x < Map_size; x++)
                 for (int y = 0; y < Map_size; y++)
                 {
-                    map[x, y] = Math.Clamp(savedMap[x, y], -1, max_colors);
+                    map[x, y] = Math.Clamp(stateMap[x, y], -1, max_colors);
 
                     Ball b;
                     b.x = x;
@@ -99,7 +140,7 @@ namespace LogicLines
 
             for (int i = 0; i < 3; i++)
             {
-                balls[i] = savedBalls[i];
+                balls[i] = stateBalls[i];
                 // защита от повреждённого сейва: координаты вне поля
                 // или недопустимый цвет - шарик отбрасываем (x = -1),
                 // иначе ShowNextBall упадёт с IndexOutOfRangeException
@@ -145,7 +186,14 @@ namespace LogicLines
                     destin_ball.y = y;
                     destin_ball.color = marked_ball.color;
                     if (FindPath())
+                    {
+                        // ход стартует: фиксируем состояние ДО него -
+                        // этот снимок станет точкой отмены; новый ход
+                        // снова разрешает отмену (нельзя отменить дважды)
+                        CaptureSnapshot();
+                        snapshotUsed = false;
                         status = Status.path_show;
+                    }
 
                     return;
                 }
@@ -215,6 +263,83 @@ namespace LogicLines
         private int strip_step;
         private int Score = 0;
         internal List<FieldAddress> free_fields = new List<FieldAddress>(); // internal - для юнит-тестов
+
+        // --- отмена последнего хода ---
+
+        // снимок состояния партии перед завершённым ходом (глубокие
+        // копии); Combo зарезервирован под комбо-режим (пока всегда 1)
+        internal class MoveSnapshot
+        {
+            public MoveSnapshot(int[,] map, Ball[] balls, int score)
+            {
+                Map = map;
+                Balls = balls;
+                Score = score;
+            }
+
+            public int[,] Map;
+            public Ball[] Balls;
+            public int Score;
+            public int Combo = 1;
+        }
+
+        internal MoveSnapshot? snapshot; // internal - для юнит-тестов
+        // снимок уже отменён: до следующего завершённого хода отменять
+        // нечего (нельзя дважды отменить один и тот же ход)
+        internal bool snapshotUsed; // internal - для юнит-тестов
+
+        // число отмен за партию (от него зависит штраф); не
+        // восстанавливается при отмене, сохраняется вместе с партией
+        public int UndoCount { get; internal set; } // internal set - для юнит-тестов
+
+        // отмена возможна: есть неиспользованный снимок, логика ждёт
+        // хода (выбранный шарик - тоже ждёт) или игра окончена (ход,
+        // заполнивший поле, можно отменить до записи рекорда)
+        public bool CanUndo => snapshot != null && !snapshotUsed &&
+            (status == Status.wait || status == Status.ball_mark || status == Status.stop);
+
+        // штраф за n-ю отмену за партию: 1-я бесплатна, далее
+        // -1 за каждый десяток отмен (2-10, 11-20, ...), максимум -5
+        public static int UndoPenalty(int n)
+        {
+            if (n <= 1) return 0;
+            return Math.Min(5, (n - 1) / 10 + 1);
+        }
+
+        // состояние снимка для сохранения партии (UI копирует данные)
+        public int[,]? UndoSnapshotMap => snapshot?.Map;
+        public Ball[]? UndoSnapshotBalls => snapshot?.Balls;
+        public int UndoSnapshotScore => snapshot?.Score ?? 0;
+        public bool UndoSnapshotUsed => snapshotUsed;
+
+        // отмена последнего завершённого хода: поле, следующие шарики,
+        // счёт и состояние комбо возвращаются из снимка; применяется
+        // штраф за номер отмены (итоговый счёт не ниже нуля); снимок
+        // помечается использованным - до нового хода отменять нечего.
+        // false - отменять нечего (CanUndo)
+        public bool Undo()
+        {
+            MoveSnapshot? snap = snapshot;
+            if (snap == null || !CanUndo)
+                return false;
+
+            UndoCount++;
+            snapshotUsed = true;
+            int restoredScore = Math.Max(0, snap.Score - UndoPenalty(UndoCount));
+            ApplyState(snap.Map, snap.Balls, restoredScore);
+            return true;
+        }
+
+        // фиксация состояния перед ходом (глубокие копии)
+        private void CaptureSnapshot()
+        {
+            var m = new int[Map_size, Map_size];
+            Array.Copy(map, m, map.Length);
+            var nb = new Ball[balls.Length];
+            Array.Copy(balls, nb, balls.Length);
+            snapshot = new MoveSnapshot(m, nb, Score);
+        }
+
         public struct FieldAddress
         {
             public int x;

@@ -80,6 +80,8 @@ namespace Lines.Shared.Screens
         private bool askName;
         private bool nameDialogOpen; // нативный диалог (Android) уже показан
         private int lastResultIndex = -1; // подсветка свежей записи
+        // особая подпись под таблицей конца игры («не попал в топ-10»)
+        private string gameOverFooter;
         private KeyboardState prevKeys;
 
         // ручное сохранение в этой сессии: слот и число ходов после него.
@@ -465,15 +467,16 @@ namespace Lines.Shared.Screens
                 return;
             }
 
-            // нижняя панель: Новая игра / Сохранить / Загрузить /
-            // Настройки / Рекорды / Выход
-            foreach (PanelButton btn in HudRenderer.Buttons)
+            // нижняя панель: Новая игра / Отменить / Сохранить /
+            // Загрузить (не в портрете) / Настройки / Рекорды / Выход
+            foreach (PanelButton btn in HudRenderer.VisibleButtons(layout))
             {
                 if (!HudRenderer.ButtonRect(layout, btn).Contains(click))
                     continue;
                 switch (btn)
                 {
                     case PanelButton.NewGame: OnNewGameButton(); break;
+                    case PanelButton.Undo: DoUndo(); break;
                     case PanelButton.Save: SavesRequested?.Invoke(true); break;
                     case PanelButton.Load: SavesRequested?.Invoke(false); break;
                     case PanelButton.Settings: SettingsRequested?.Invoke(); break;
@@ -519,6 +522,29 @@ namespace Lines.Shared.Screens
                 movesSinceSave++;
         }
 
+        // отмена последнего хода (кнопка панели, Ctrl+Z): логика шлёт
+        // полный перерендер поля, как при загрузке сохранения; доступна
+        // и на экране конца игры - до сохранения результата в рекордах
+        private void DoUndo()
+        {
+            if (!game.CanUndo)
+                return;
+            // рекорд уже сохранён (таблица показана) - партия завершена,
+            // отменять поздно (спецификация - «до сохранения результата»)
+            if (goStage == GoStage.ShowTable)
+                return;
+
+            // визуал сбрасываем: собранный из событий перерендер
+            // построит актуальное состояние без анимаций
+            ResetVisuals();
+            events.Clear();
+            restoring = true;
+            game.Undo();
+            ProcessEvents();
+            restoring = false;
+            boardRenderer.ClearAppear();
+        }
+
         // --- конец игры: ввод имени и таблица рекордов ---
 
         private void UpdateGameOverStage()
@@ -527,6 +553,7 @@ namespace Lines.Shared.Screens
             {
                 goStage = results.Qualifies(score) ? GoStage.EnterName : GoStage.ShowTable;
                 lastResultIndex = -1;
+                gameOverFooter = null;
                 recordsOpen = false; // диалог конца игры главнее
                 if (goStage == GoStage.EnterName)
                 {
@@ -535,6 +562,14 @@ namespace Lines.Shared.Screens
                         playerName = settingsService.Current.PlayerName;
                     if (namePrompter != null)
                         AskNameNative();
+                }
+                else if (results.Entries.Count > 0)
+                {
+                    // результат не попал в топ-10: сообщаем об этом и
+                    // подсвечиваем пороговую (последнюю) строку таблицы
+                    lastResultIndex = results.Entries.Count - 1;
+                    gameOverFooter = string.Format(Strings.Current.NotInTopFormat,
+                        results.Entries[results.Entries.Count - 1].Score);
                 }
             }
             else if (!game.IsGameOver)
@@ -612,6 +647,13 @@ namespace Lines.Shared.Screens
             {
                 game.NewGame();
             }
+            // Ctrl+Z - отмена последнего хода (как кнопка «Отменить»);
+            // поверх открытых диалогов не срабатывает
+            if (!nameEntry && !exitConfirmOpen && !exitPromptOpen
+                && !newGamePromptOpen && !recordsOpen
+                && Pressed(kb, Keys.Z)
+                && (kb.IsKeyDown(Keys.LeftControl) || kb.IsKeyDown(Keys.RightControl)))
+                DoUndo();
             prevKeys = kb;
         }
 
@@ -731,6 +773,27 @@ namespace Lines.Shared.Screens
                 save.NextBalls[i * 3 + 1] = nb[i].y;
                 save.NextBalls[i * 3 + 2] = nb[i].color;
             }
+
+            // состояние отмены хода сохраняется вместе с партией
+            save.UndoCount = game.UndoCount;
+            save.UndoUsed = game.UndoSnapshotUsed;
+            int[,] sm = game.UndoSnapshotMap;
+            Ball[] snb = game.UndoSnapshotBalls;
+            if (sm != null && snb != null)
+            {
+                save.UndoBalls = new int[MapSize * MapSize];
+                save.UndoNextBalls = new int[9];
+                for (int x = 0; x < MapSize; x++)
+                    for (int y = 0; y < MapSize; y++)
+                        save.UndoBalls[y * MapSize + x] = sm[x, y];
+                for (int i = 0; i < 3; i++)
+                {
+                    save.UndoNextBalls[i * 3] = snb[i].x;
+                    save.UndoNextBalls[i * 3 + 1] = snb[i].y;
+                    save.UndoNextBalls[i * 3 + 2] = snb[i].color;
+                }
+                save.UndoScore = game.UndoSnapshotScore;
+            }
             return save;
         }
 
@@ -768,6 +831,26 @@ namespace Lines.Shared.Screens
             events.Clear();
             restoring = true;
             game.Restore(m, nb, save.Score);
+
+            // состояние отмены хода (у старых сохранений его нет -
+            // UndoBalls null, партия начинается без возможности отмены)
+            if (save.UndoBalls != null && save.UndoBalls.Length == MapSize * MapSize &&
+                save.UndoNextBalls != null && save.UndoNextBalls.Length >= 9)
+            {
+                var um = new int[MapSize, MapSize];
+                for (int x = 0; x < MapSize; x++)
+                    for (int y = 0; y < MapSize; y++)
+                        um[x, y] = save.UndoBalls[y * MapSize + x];
+                var unb = new Ball[3];
+                for (int i = 0; i < 3; i++)
+                {
+                    unb[i].x = save.UndoNextBalls[i * 3];
+                    unb[i].y = save.UndoNextBalls[i * 3 + 1];
+                    unb[i].color = save.UndoNextBalls[i * 3 + 2];
+                }
+                game.RestoreUndoState(um, unb, save.UndoScore, save.UndoUsed, save.UndoCount);
+            }
+
             ProcessEvents();
             restoring = false;
             boardRenderer.ClearAppear(); // восстановленное поле рисуем сразу, без «появления»
@@ -789,14 +872,18 @@ namespace Lines.Shared.Screens
 
             hud.DrawPanel(spriteBatch, layout, scoreText, nextColors);
             boardRenderer.Draw(spriteBatch, layout, time, ShowTrails, bouncePhase);
-            hud.DrawStatusBar(spriteBatch, layout);
+            hud.DrawStatusBar(spriteBatch, layout, game.CanUndo);
             pedestals.Draw(spriteBatch, layout, viewport, score);
 
             if (game.IsGameOver)
             {
                 EnsureResultsCache();
                 gameOverOverlay.DrawGameOver(spriteBatch, viewport, goStage == GoStage.EnterName,
-                    scoreText, playerName, blinkPhase, namePrompter != null, resultsRows, lastResultIndex);
+                    scoreText, playerName, blinkPhase, namePrompter != null, resultsRows,
+                    lastResultIndex, gameOverFooter,
+                    // пороговая строка («обыграйте N») - оранжевая подсветка,
+                    // свежая запись - зелёная по умолчанию
+                    gameOverFooter != null ? new Color(200, 120, 40) : (Color?)null);
             }
             else if (recordsOpen)
             {
@@ -818,17 +905,21 @@ namespace Lines.Shared.Screens
             }
             if (exitConfirmOpen)
             {
-                // подтверждение выхода из игры (Esc / кнопка «Выход»)
+                // подтверждение выхода из игры (Esc / кнопка «Выход»);
+                // вопрос заметно крупнее, чем в прочих диалогах
                 OverlayDialogs.DrawDialog(spriteBatch, pixel, fonts, viewport, t.ExitConfirmPrompt,
                     OverlayDialogs.ComputeTwoButtonLayout(viewport),
-                    t.Yes, UiTheme.Danger, t.No, UiTheme.Confirm);
+                    t.Yes, UiTheme.Danger, t.No, UiTheme.Confirm,
+                    questionBaseScale: 1.75f);
             }
             if (newGamePromptOpen)
             {
-                // диалог кнопки «Новая игра»: начать новую / загрузить / отмена
+                // диалог кнопки «Новая игра»: начать новую / загрузить / отмена;
+                // вопрос крупнее, как у подтверждения выхода
                 OverlayDialogs.DrawDialog(spriteBatch, pixel, fonts, viewport, t.NewGamePrompt,
                     OverlayDialogs.ComputeThreeButtonLayout(viewport),
-                    t.NewGame, UiTheme.Confirm, t.Load, UiTheme.Neutral, t.Cancel, UiTheme.Danger);
+                    t.NewGame, UiTheme.Confirm, t.Load, UiTheme.Neutral, t.Cancel, UiTheme.Danger,
+                    questionBaseScale: 1.75f);
             }
         }
 
