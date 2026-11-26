@@ -98,7 +98,10 @@ namespace LogicLines.Tests
             MakeSimpleMove(game);
             Assert.True(game.CanUndo);
             Assert.Equal(1, game.map[8, 8]);
-            Assert.Equal(0, game.map[0, 0]);
+            // шарик уехал: клетка пуста (0) либо на неё попала
+            // резервация (-1) под подсказку следующего шарика -
+            // позиции подсказок логика выбирает случайно
+            Assert.True(game.map[0, 0] <= 0);
 
             view.Events.Clear();
             Assert.True(game.Undo());
