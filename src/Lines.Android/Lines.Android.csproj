@@ -6,6 +6,10 @@
     <ApplicationId>com.val.lines</ApplicationId>
     <ApplicationVersion>2</ApplicationVersion>
     <ApplicationDisplayVersion>1.1.0</ApplicationDisplayVersion>
+    <!-- net9.0-android вне поддержки: новые SDK (10/11, например в образе
+         windows-latest на GitHub Actions) выдают ошибку NETSDK1202.
+         Проверка отключена до перехода на net10.0-android -->
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="MonoGame.Content.Builder.Task" Version="3.8.*" />
