@@ -101,6 +101,10 @@ LinesMonoGame/
 - `src/Lines.Android` — mgandroid, **net9.0-android**. Собирается:
   `build/publish-android.ps1` (или `dotnet publish` с
   `-p:AndroidSdkDirectory`, SDK не авто-детектится без ANDROID_HOME).
+  Workload net9.0-android вне поддержки: SDK 10/11 (например, в образе
+  windows-latest на GitHub Actions) выдают ошибку NETSDK1202 - в csproj
+  отключена проверка `CheckEolTargetFramework=false`; при переходе на
+  net10.0-android свойство убрать.
   Проверено: `com.val.lines-Signed.apk` (~10,7 МБ) + `.aab`
   собираются из чистого состояния. SDK ставился через
   `-t:InstallAndroidDependencies -p:AcceptAndroidSDKLicenses=true
