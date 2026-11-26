@@ -66,7 +66,8 @@ namespace Lines.Shared.Screens
         // cursorPhase - фаза [0, 1) мигания курсора в поле имени
         public void DrawGameOver(SpriteBatch sb, Viewport viewport, bool enterName,
             string scoreText, string playerName, float cursorPhase, bool nativeDialog,
-            IReadOnlyList<ResultRow> rows, int highlight)
+            IReadOnlyList<ResultRow> rows, int highlight, string tableFooter = null,
+            Color? highlightColor = null)
         {
             sb.Draw(pixel, new Rectangle(0, 0, viewport.Width, viewport.Height), UiTheme.OverlayDim);
 
@@ -74,16 +75,19 @@ namespace Lines.Shared.Screens
 
             if (enterName)
             {
-                OverlayDialogs.DrawCentered(sb, fonts, Strings.Current.GameOver, viewport, l.TitleY, 1.6f, Color.White);
-                OverlayDialogs.DrawCentered(sb, fonts, scoreText, viewport, l.ScoreY, 1.2f,
-                    new Color(230, 220, 180));
+                OverlayDialogs.DrawCentered(sb, fonts, Strings.Current.GameOver, viewport, l.TitleY,
+                    1.6f * UiTheme.TextScale(viewport), Color.White);
+                OverlayDialogs.DrawCentered(sb, fonts, scoreText, viewport, l.ScoreY,
+                    1.2f * UiTheme.TextScale(viewport), new Color(230, 220, 180));
                 DrawNameEntry(sb, l, viewport, Strings.Current.NewRecordEnterName, playerName, cursorPhase, nativeDialog);
             }
             else
             {
                 // на экране результатов заголовок «Рекорды» рисует сама
-                // таблица - высоко и без дублей
-                DrawResultsTable(sb, l, viewport, Strings.Current.ClickForNewGame, rows, highlight);
+                // таблица - высоко и без дублей; tableFooter - особая
+                // подпись (например «не попал в топ-10»), иначе стандартная
+                DrawResultsTable(sb, l, viewport,
+                    tableFooter ?? Strings.Current.ClickForNewGame, rows, highlight, highlightColor);
             }
         }
 
@@ -94,12 +98,13 @@ namespace Lines.Shared.Screens
         {
             sb.Draw(pixel, new Rectangle(0, 0, viewport.Width, viewport.Height), UiTheme.OverlayDim);
             Layout l = ComputeLayout(viewport);
-            OverlayDialogs.DrawCentered(sb, fonts, Strings.Current.Welcome, viewport, l.TitleY, 1.6f, Color.White);
+            OverlayDialogs.DrawCentered(sb, fonts, Strings.Current.Welcome, viewport, l.TitleY,
+                1.6f * UiTheme.TextScale(viewport), Color.White);
             if (nativeDialog)
             {
                 // на Android имя спрашивает нативный диалог поверх игры
-                OverlayDialogs.DrawCentered(sb, fonts, Strings.Current.AskName, viewport, l.PromptY, 1.0f,
-                    UiTheme.Accent);
+                OverlayDialogs.DrawCentered(sb, fonts, Strings.Current.AskName, viewport, l.PromptY,
+                    1.0f * UiTheme.TextScale(viewport), UiTheme.Accent);
                 return;
             }
             DrawNameEntry(sb, l, viewport, Strings.Current.AskName, playerName, cursorPhase, nativeDialog);
@@ -122,8 +127,8 @@ namespace Lines.Shared.Screens
         private void DrawNameEntry(SpriteBatch sb, Layout l, Viewport viewport, string prompt,
             string playerName, float cursorPhase, bool nativeDialog)
         {
-            OverlayDialogs.DrawCentered(sb, fonts, prompt, viewport, l.PromptY, 1.0f,
-                UiTheme.Accent);
+            OverlayDialogs.DrawCentered(sb, fonts, prompt, viewport, l.PromptY,
+                1.0f * UiTheme.TextScale(viewport), UiTheme.Accent);
 
             if (nativeDialog)
                 return; // имя спрашивает нативный диалог поверх игры
@@ -145,14 +150,21 @@ namespace Lines.Shared.Screens
 
         // таблица рекордов: топ-10, свежая запись подсвечена;
         // строки уже отформатированы (кэш GameScreen)
+        // подсветка строки highlight: highlightColor = null - зелёная
+        // (свежая запись), иначе переданный цвет (порог топ-10 - оранжевый)
         private void DrawResultsTable(SpriteBatch sb, Layout l, Viewport viewport, string footer,
-            IReadOnlyList<ResultRow> rows, int highlight)
+            IReadOnlyList<ResultRow> rows, int highlight, Color? highlightColor = null)
         {
-            OverlayDialogs.DrawCentered(sb, fonts, Strings.Current.Records, viewport, l.PromptY, 1.45f,
-                UiTheme.Accent);
+            OverlayDialogs.DrawCentered(sb, fonts, Strings.Current.Records, viewport, l.PromptY,
+                1.9f * UiTheme.TextScale(viewport), UiTheme.Accent);
 
             float rowH = l.TableRowHeight;
-            SpriteFont sf = fonts.Pick(rowH * 0.72f / fonts.Base.LineSpacing, out float scale);
+            // строки таблицы крупнеют умеренно (слабее заголовков) и
+            // ограничены высотой строки - все 10 записей должны влезать
+            float rowScale = rowH * 0.72f * (1f + (UiTheme.Scale(viewport) - 1f) * 0.2f)
+                / fonts.Base.LineSpacing;
+            rowScale = Math.Min(rowScale, rowH * 0.9f / fonts.Base.LineSpacing);
+            SpriteFont sf = fonts.Pick(rowScale, out float scale);
             float xPos = l.TableX, xName = l.TableX + 60,
                 xScore = l.TableX + l.TableWidth * 0.50f,
                 xDate = l.TableX + l.TableWidth * 0.68f;
@@ -162,7 +174,7 @@ namespace Lines.Shared.Screens
                 if (i == highlight)
                     sb.Draw(pixel, new Rectangle((int)l.TableX - 8, (int)y - 2,
                             (int)l.TableWidth + 16, (int)rowH),
-                        UiTheme.Confirm * 0.5f);
+                        (highlightColor ?? UiTheme.Confirm) * 0.5f);
                 Color color = i == highlight ? new Color(255, 240, 180) : Color.White;
                 // дата - относительное время; у старых записей даты
                 // может не быть - тогда пусто
@@ -172,8 +184,8 @@ namespace Lines.Shared.Screens
                 sb.DrawString(sf, rows[i].Date, new Vector2(xDate, y), color, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
             }
 
-            OverlayDialogs.DrawCentered(sb, fonts, footer, viewport, viewport.Height - 50, 0.9f,
-                UiTheme.FooterText);
+            OverlayDialogs.DrawCentered(sb, fonts, footer, viewport, viewport.Height - 50,
+                0.9f * UiTheme.TextScale(viewport), UiTheme.FooterText);
         }
     }
 }

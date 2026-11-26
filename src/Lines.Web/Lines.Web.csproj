@@ -9,8 +9,8 @@
     <AssemblyName>Lines.Web</AssemblyName>
     <DefineConstants>$(DefineConstants);BLAZORGL</DefineConstants>
     <KniPlatform>BlazorGL</KniPlatform>
-    <Version>1.0.0</Version>
-    <InformationalVersion>1.0.0</InformationalVersion>
+    <Version>1.1.0</Version>
+    <InformationalVersion>1.1.0</InformationalVersion>
   </PropertyGroup>
 
   <PropertyGroup>

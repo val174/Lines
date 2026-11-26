@@ -4,13 +4,15 @@ using Lines.Shared.Localization;
 using Lines.Shared.Rendering;
 using Lines.Shared.Settings;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Audio;
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
 
 namespace Lines.Shared.Screens
 {
-    // Экран настроек: звук (вкл/выкл), громкость (ползунок 0-100%),
-    // следы шариков (вкл/выкл), режим экрана (окно / полный экран),
+    // Экран настроек: звук (вкл/выкл), громкость (уровни 0-10: кнопки
+    // -/+ и тап по сегменту шкалы, без перетаскивания), следы шариков
+    // (вкл/выкл), режим экрана (окно / полный экран),
     // очистка рекордов (двухшаговое подтверждение), кнопка «Назад».
     // Все изменения применяются сразу и сохраняются
     // через SettingsService (событие Changed - у LinesGame и GameScreen).
@@ -27,7 +29,7 @@ namespace Lines.Shared.Screens
         private readonly SettingsService settings;
         private readonly ResultsService results;
         private readonly FontSet fonts;
-        private readonly BallRenderer balls;
+        private readonly SoundEffect sndSample; // звук-пример громкости
         private readonly Texture2D pixel;
         private readonly PointerInput pointer = new PointerInput();
 
@@ -47,7 +49,7 @@ namespace Lines.Shared.Screens
             this.settings = settings;
             this.results = results;
             fonts = new FontSet(content);
-            balls = new BallRenderer(device, content);
+            sndSample = content.Load<SoundEffect>("Sounds/select");
             pixel = new Texture2D(device, 1, 1);
             pixel.SetData(new[] { Color.White });
         }
@@ -95,16 +97,33 @@ namespace Lines.Shared.Screens
                 }
                 else if (l.BackButton.Contains(click))
                     Back?.Invoke();
+                // громкость: -/+ шаг на уровень, тап по сегменту - сразу
+                // уровень (перетаскивания нет - на таче оно «зависало»)
+                else if (l.VolumeMinus.Contains(click))
+                    SetVolumeLevel(VolumeLevel() - 1);
+                else if (l.VolumePlus.Contains(click))
+                    SetVolumeLevel(VolumeLevel() + 1);
+                else if (l.VolumeSegments.Contains(click))
+                {
+                    int seg = (click.X - l.VolumeSegments.X) * 10 / l.VolumeSegments.Width;
+                    SetVolumeLevel(seg + 1);
+                }
             }
+        }
 
-            // ползунок громкости - и клик по дорожке, и перетаскивание
-            if ((pointer.IsDown && l.VolumeTrack.Contains(pointer.Position)) ||
-                (pointer.Click.HasValue && l.VolumeTrack.Contains(pointer.Click.Value)))
-            {
-                int x = pointer.IsDown ? pointer.Position.X : pointer.Click.Value.X;
-                int volume = (int)Math.Round((x - l.VolumeTrack.X) / (float)l.VolumeTrack.Width * 100f);
-                settings.Update(s => s.Volume = volume);
-            }
+        // текущий уровень громкости 0-10 (Volume хранит 0-100%)
+        private int VolumeLevel() =>
+            Math.Clamp((int)Math.Round(settings.Current.Volume / 10.0), 0, 10);
+
+        private void SetVolumeLevel(int level)
+        {
+            level = Math.Clamp(level, 0, 10);
+            if (level == VolumeLevel())
+                return;
+            settings.Update(s => s.Volume = level * 10);
+            // звук-пример: сразу слышно новую громкость
+            if (settings.Current.SoundEnabled)
+                sndSample.Play();
         }
 
         public void Draw(SpriteBatch sb, Viewport viewport)
@@ -113,10 +132,10 @@ namespace Lines.Shared.Screens
             Strings t = Strings.Current;
 
             DrawTitle(sb, viewport, t.Settings);
-            DrawToggleRow(sb, l.SoundRow, t.Sound, settings.Current.SoundEnabled);
+            DrawToggleRow(sb, l.SoundRow, l.S, t.Sound, settings.Current.SoundEnabled);
             DrawVolumeRow(sb, l, string.Format(t.VolumeFormat, settings.Current.Volume));
-            DrawToggleRow(sb, l.TrailsRow, t.BallTrails, settings.Current.ShowBallTrails);
-            DrawToggleRow(sb, l.AutoSaveRow, t.AutoSave, settings.Current.AutoSaveEnabled);
+            DrawToggleRow(sb, l.TrailsRow, l.S, t.BallTrails, settings.Current.ShowBallTrails);
+            DrawToggleRow(sb, l.AutoSaveRow, l.S, t.AutoSave, settings.Current.AutoSaveEnabled);
             DrawLanguageRow(sb, l, t);
             if (ShowScreenMode)
                 DrawModeRow(sb, l, t);
@@ -126,11 +145,20 @@ namespace Lines.Shared.Screens
 
         // --- раскладка ---
 
+        // масштаб интерфейса - общий хелпер UiTheme.Scale (от меньшей
+        // стороны экрана; в десктопном окне ~800x571 s ~= 1)
+        private static float UiScale(Viewport viewport) => UiTheme.Scale(viewport);
+
         private struct Layout
         {
+            public float S; // масштаб для мелких элементов (ползунок и т.п.)
             public Rectangle SoundRow;
             public Rectangle VolumeRow;
-            public Rectangle VolumeTrack;
+            // громкость: уровни 0-10, кнопки - и + по краям, между ними
+            // шкала из 10 сегментов (тап по сегменту = сразу уровень)
+            public Rectangle VolumeMinus;
+            public Rectangle VolumePlus;
+            public Rectangle VolumeSegments;
             public Rectangle TrailsRow;
             public Rectangle AutoSaveRow;
             public Rectangle LanguageRow;
@@ -142,20 +170,28 @@ namespace Lines.Shared.Screens
 
         private static Layout ComputeLayout(Viewport viewport)
         {
-            int titleBand = Math.Max(60, viewport.Height / 6);
-            int bottomBand = Math.Max(70, viewport.Height / 6);
+            float s = UiScale(viewport);
+            int titleBand = Math.Max((int)(60 * s), viewport.Height / 6);
+            int bottomBand = Math.Max((int)(70 * s), viewport.Height / 6);
             int areaH = viewport.Height - titleBand - bottomBand;
-            int rowH = Math.Min(72, Math.Max(44, areaH / (RowCount + 1)));
-            int colW = Math.Min(560, (int)(viewport.Width * 0.86f));
+            int rowH = Math.Min((int)(72 * s), Math.Max((int)(44 * s), areaH / (RowCount + 1)));
+            int colW = Math.Min((int)(560 * s), (int)(viewport.Width * 0.92f));
             int x = (viewport.Width - colW) / 2;
             int y = titleBand + Math.Max(0, (areaH - rowH * RowCount) / 2);
 
             Layout l;
+            l.S = s;
             l.SoundRow = new Rectangle(x, y, colW, rowH);
             l.VolumeRow = new Rectangle(x, y + rowH, colW, rowH);
-            int trackH = Math.Max(8, rowH / 8);
-            int trackW = (int)(colW * 0.6f);
-            l.VolumeTrack = new Rectangle(x + colW - trackW, y + rowH + (rowH - trackH) / 2, trackW, trackH);
+            // зона громкости - точно по ширине кнопок остальных строк:
+            // кнопки -/+ по краям, между ними шкала сегментов
+            Rectangle zone = RowButton(l.VolumeRow, s);
+            int pmW = Math.Min((int)(56 * s), zone.Width / 4);
+            int vgap = Math.Max(4, (int)(8 * s));
+            l.VolumeMinus = new Rectangle(zone.X, zone.Y, pmW, zone.Height);
+            l.VolumePlus = new Rectangle(zone.Right - pmW, zone.Y, pmW, zone.Height);
+            l.VolumeSegments = new Rectangle(zone.X + pmW + vgap,
+                zone.Y + zone.Height / 6, zone.Width - 2 * (pmW + vgap), zone.Height * 2 / 3);
             l.TrailsRow = new Rectangle(x, y + 2 * rowH, colW, rowH);
             l.AutoSaveRow = new Rectangle(x, y + 3 * rowH, colW, rowH);
             l.LanguageRow = new Rectangle(x, y + 4 * rowH, colW, rowH);
@@ -168,8 +204,8 @@ namespace Lines.Shared.Screens
             int clearIdx = ShowScreenMode ? 6 : 5;
             l.ClearRow = new Rectangle(x, y + clearIdx * rowH, colW, rowH);
 
-            int backW = Math.Min(220, colW / 2);
-            int backH = Math.Min(56, bottomBand - 20);
+            int backW = Math.Min((int)(220 * s), colW / 2);
+            int backH = Math.Min((int)(56 * s), bottomBand - 20);
             l.BackButton = new Rectangle((viewport.Width - backW) / 2,
                 viewport.Height - bottomBand + (bottomBand - backH) / 2, backW, backH);
             return l;
@@ -179,7 +215,7 @@ namespace Lines.Shared.Screens
 
         private void DrawTitle(SpriteBatch sb, Viewport viewport, string title)
         {
-            int bandHeight = Math.Max(60, viewport.Height / 6);
+            int bandHeight = Math.Max((int)(60 * UiScale(viewport)), viewport.Height / 6);
             SpriteFont sf = fonts.Pick(bandHeight * 0.55f / fonts.Base.LineSpacing, out float scale);
             scale = Math.Min(scale, viewport.Width * 0.8f / sf.MeasureString(title).X);
             Vector2 size = sf.MeasureString(title) * scale;
@@ -188,17 +224,24 @@ namespace Lines.Shared.Screens
                 UiTheme.Accent, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
         }
 
+        // единый размер кнопок во всех строках (Вкл/Выкл, язык,
+        // «Очистить»/«Подтвердить?»): одна ширина, чтобы длинный текст
+        // «Confirm?» влезал без сильного ужатия (clamp в DrawButton)
+        private static Rectangle RowButton(Rectangle row, float s)
+        {
+            int btnW = Math.Min((int)(260 * s), row.Width / 2);
+            return new Rectangle(row.Right - btnW, row.Y + row.Height / 6, btnW, row.Height * 2 / 3);
+        }
+
         // строка-переключатель: подпись слева, кнопка со состоянием справа
-        private void DrawToggleRow(SpriteBatch sb, Rectangle row, string label, bool enabled)
+        private void DrawToggleRow(SpriteBatch sb, Rectangle row, float s, string label, bool enabled)
         {
             SpriteFont sf = fonts.Pick(row.Height * 0.4f / fonts.Base.LineSpacing, out float scale);
             sb.DrawString(sf, label, new Vector2(row.X, row.Y + (row.Height - sf.LineSpacing * scale) / 2f),
                 Color.White, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
 
             Strings t = Strings.Current;
-            int btnW = Math.Min(190, row.Width / 3);
-            var btn = new Rectangle(row.Right - btnW, row.Y + row.Height / 6, btnW, row.Height * 2 / 3);
-            DrawButton(sb, btn, enabled ? t.On : t.Off,
+            DrawButton(sb, RowButton(row, s), enabled ? t.On : t.Off,
                 enabled ? UiTheme.Confirm : UiTheme.Danger,
                 Color.White);
         }
@@ -210,17 +253,19 @@ namespace Lines.Shared.Screens
                 new Vector2(l.VolumeRow.X, l.VolumeRow.Y + (l.VolumeRow.Height - sf.LineSpacing * scale) / 2f),
                 Color.White, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
 
-            // дорожка: заполненная часть - жёлтая, остаток - тёмный
-            int fillW = (int)(l.VolumeTrack.Width * settings.Current.Volume / 100f);
-            sb.Draw(pixel, l.VolumeTrack, new Color(50, 48, 42));
-            sb.Draw(pixel, new Rectangle(l.VolumeTrack.X, l.VolumeTrack.Y, fillW, l.VolumeTrack.Height),
-                new Color(225, 205, 40));
+            DrawButton(sb, l.VolumeMinus, "-", UiTheme.PanelAlt, Color.White);
+            DrawButton(sb, l.VolumePlus, "+", UiTheme.PanelAlt, Color.White);
 
-            // ползунок - шарик на границе заполненной части
-            int knob = Math.Max(18, l.VolumeRow.Height / 2);
-            var knobRect = new Rectangle(l.VolumeTrack.X + fillW - knob / 2,
-                l.VolumeTrack.Y + l.VolumeTrack.Height / 2 - knob / 2, knob, knob);
-            balls.Draw(sb, 2, knobRect); // 2 - жёлтый
+            // шкала из 10 сегментов: заполненные (уровень) - жёлтые
+            int level = VolumeLevel();
+            int gap = Math.Max(2, l.VolumeSegments.Height / 10);
+            int segW = (l.VolumeSegments.Width - gap * 9) / 10;
+            for (int i = 0; i < 10; i++)
+            {
+                var seg = new Rectangle(l.VolumeSegments.X + i * (segW + gap),
+                    l.VolumeSegments.Y, segW, l.VolumeSegments.Height);
+                sb.Draw(pixel, seg, i < level ? new Color(225, 205, 40) : new Color(50, 48, 42));
+            }
         }
 
         // язык интерфейса: циклическая кнопка Авто/Русский/English
@@ -241,10 +286,7 @@ namespace Lines.Shared.Screens
                 l.LanguageRow.Y + (l.LanguageRow.Height - sf.LineSpacing * scale) / 2f),
                 Color.White, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
 
-            int btnW = Math.Min(190, l.LanguageRow.Width / 3);
-            var btn = new Rectangle(l.LanguageRow.Right - btnW, l.LanguageRow.Y + l.LanguageRow.Height / 6,
-                btnW, l.LanguageRow.Height * 2 / 3);
-            DrawButton(sb, btn, LanguageLabel(t), UiTheme.PanelAlt, Color.White);
+            DrawButton(sb, RowButton(l.LanguageRow, l.S), LanguageLabel(t), UiTheme.PanelAlt, Color.White);
         }
 
         // режим экрана: сегмент «Окно» / «Полный экран»
@@ -265,10 +307,7 @@ namespace Lines.Shared.Screens
                 l.ClearRow.Y + (l.ClearRow.Height - sf.LineSpacing * scale) / 2f),
                 Color.White, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
 
-            int btnW = Math.Min(260, l.ClearRow.Width / 2);
-            var btn = new Rectangle(l.ClearRow.Right - btnW, l.ClearRow.Y + l.ClearRow.Height / 6,
-                btnW, l.ClearRow.Height * 2 / 3);
-            DrawButton(sb, btn, clearArmed ? t.ConfirmPrompt : t.Clear,
+            DrawButton(sb, RowButton(l.ClearRow, l.S), clearArmed ? t.ConfirmPrompt : t.Clear,
                 clearArmed ? UiTheme.Danger : UiTheme.PanelAlt, Color.White);
         }
 

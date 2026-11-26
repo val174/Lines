@@ -12,30 +12,71 @@ namespace Lines.Shared.Screens
     // Экран заставки: надпись «Шарики» сверху, картинка игрового поля
     // (Content/splash.png, генерируется build/generate-splash.py) с красным
     // шариком в короне в центре, строка состояния снизу (версия + автор).
-    // Переход в игру - по клику/тапу или автоматически через
-    // SplashDurationSeconds (что наступит раньше).
+    // На свободных клетках поля изредка «появляются» шарики (эффект как
+    // в игре; короля по центру не перекрывают); внизу - прогресс-бар
+    // оставшегося времени. Переход в игру - по клику/тапу или
+    // автоматически через SplashDurationSeconds (что наступит раньше).
     public class SplashScreen : IScreen
     {
-        // длительность показа заставки, сек; скорректировать после первых тестов
-        public const float SplashDurationSeconds = 10f;
+        // длительность показа заставки, сек
+        public const float SplashDurationSeconds = 6f;
 
         // автор - константа из спецификации
-        public const string Author = "Val + Kimi";
+        public const string Author = "V.Alekhnovich";
 
         private readonly FontSet fonts;
         private readonly Texture2D splash;
         private readonly Texture2D pixel;
+        private readonly BallRenderer balls;
         private readonly PointerInput pointer = new PointerInput();
         private readonly string version;
         private float elapsed;
 
+        // периодическое «появление» шарика на свободной клетке поля
+        // (пульс 0->1 и обратно); центральный блок 3x3 - король, его не
+        // перекрываем; клетки с декоративными шариками тоже пропускаем
+        private const float AppearCycleSeconds = 2.2f;
+        private float appearAge = AppearCycleSeconds; // первое - сразу
+        private float appearX, appearY;
+        private int appearColor;
+
+        // геометрия поля внутри splash.png (build/generate-splash.py):
+        // квадрат 892 = рамка 14 + 9 клеток по 96
+        private const float MarginF = 14f / 892f;
+        private const float CellF = 96f / 892f;
+
+        // клетки, занятые декоративными шариками на картинке (DECOR)
+        private static readonly (int X, int Y)[] DecorCells =
+            { (1, 1), (2, 6), (6, 1), (7, 4), (5, 7), (1, 5), (7, 7), (3, 2) };
+
+        // свободные клетки для «появления»: всё поле минус центр 3x3
+        // (король) и декоративные шарики
+        private static readonly (int X, int Y)[] FreeCells = BuildFreeCells();
+
+        private static (int, int)[] BuildFreeCells()
+        {
+            var list = new System.Collections.Generic.List<(int, int)>();
+            for (int x = 0; x < 9; x++)
+                for (int y = 0; y < 9; y++)
+                {
+                    bool center = x >= 3 && x <= 5 && y >= 3 && y <= 5;
+                    bool decor = System.Linq.Enumerable.Any(DecorCells, c => c.X == x && c.Y == y);
+                    if (!center && !decor)
+                        list.Add((x, y));
+                }
+            return list.ToArray();
+        }
+
         // срабатывает один раз - по клику/тапу или по таймауту
         public event Action Finished;
+
+        private readonly Random rng = new Random();
 
         public SplashScreen(GraphicsDevice device, ContentManager content)
         {
             fonts = new FontSet(content);
             splash = content.Load<Texture2D>("splash");
+            balls = new BallRenderer(device, content);
             pixel = new Texture2D(device, 1, 1);
             pixel.SetData(new[] { Color.White });
             version = GetVersion();
@@ -46,7 +87,18 @@ namespace Lines.Shared.Screens
 
         public void Update(GameTime gameTime, Viewport viewport)
         {
-            elapsed += (float)gameTime.ElapsedGameTime.TotalSeconds;
+            float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
+            elapsed += dt;
+
+            appearAge += dt;
+            if (appearAge >= AppearCycleSeconds)
+            {
+                appearAge = 0f;
+                appearColor = rng.Next(1, 7);
+                (int cx, int cy) = FreeCells[rng.Next(FreeCells.Length)];
+                appearX = MarginF + (cx + 0.5f) * CellF;
+                appearY = MarginF + (cy + 0.5f) * CellF;
+            }
 
             pointer.Update();
             if (pointer.Click.HasValue || elapsed >= SplashDurationSeconds)
@@ -57,6 +109,7 @@ namespace Lines.Shared.Screens
         {
             DrawTitle(sb, viewport);
             DrawPicture(sb, viewport);
+            DrawProgress(sb, viewport);
             DrawStatusLine(sb, viewport);
         }
 
@@ -74,15 +127,48 @@ namespace Lines.Shared.Screens
         }
 
         // картинка: квадратный splash.png по центру средней части экрана
-        private void DrawPicture(SpriteBatch sb, Viewport viewport)
+        private Rectangle PictureRect(Viewport viewport)
         {
             int top = Math.Max(60, viewport.Height / 5);
             int bottom = Math.Max(28, viewport.Height / 14); // полоса строки состояния
             int availableH = viewport.Height - top - bottom;
 
             int side = Math.Min((int)(viewport.Width * 0.86f), (int)(availableH * 0.92f));
-            var dest = new Rectangle((viewport.Width - side) / 2, top + (availableH - side) / 2, side, side);
+            return new Rectangle((viewport.Width - side) / 2, top + (availableH - side) / 2, side, side);
+        }
+
+        private void DrawPicture(SpriteBatch sb, Viewport viewport)
+        {
+            Rectangle dest = PictureRect(viewport);
             sb.Draw(splash, dest, Color.White);
+
+            // «появление» на свободной клетке: рост за 0.25 сек, затем
+            // затухание в конце цикла; размер как у декоративных шариков
+            int ballSize = (int)(dest.Width * CellF * 0.84f);
+            float grow = Math.Min(1f, appearAge / 0.25f);
+            float fade = appearAge > AppearCycleSeconds - 0.4f
+                ? (AppearCycleSeconds - appearAge) / 0.4f
+                : 1f;
+            int s = (int)(ballSize * grow);
+            if (s > 0 && fade > 0f)
+            {
+                var r = new Rectangle(
+                    dest.X + (int)(appearX * dest.Width) - s / 2,
+                    dest.Y + (int)(appearY * dest.Height) - s / 2,
+                    s, s);
+                balls.DrawTinted(sb, appearColor, r, Color.White * fade);
+            }
+        }
+
+        // прогресс-бар оставшегося времени над строкой состояния
+        private void DrawProgress(SpriteBatch sb, Viewport viewport)
+        {
+            int bandHeight = Math.Max(28, viewport.Height / 14);
+            int barH = Math.Max(4, bandHeight / 7);
+            int y = viewport.Height - bandHeight - barH;
+            sb.Draw(pixel, new Rectangle(0, y, viewport.Width, barH), new Color(30, 29, 26));
+            float k = Math.Clamp(elapsed / SplashDurationSeconds, 0f, 1f);
+            sb.Draw(pixel, new Rectangle(0, y, (int)(viewport.Width * k), barH), UiTheme.Accent);
         }
 
         // строка состояния внизу: версия игры и автор

@@ -62,34 +62,27 @@ namespace Lines.Shared.Settings
             return score > Entries[Entries.Count - 1].Score;
         }
 
-        // добавление результата; возвращает индекс записи в таблице
-        // (для подсветки) или -1, если не сохранено
+        // добавление результата; возвращает индекс новой записи
+        // (для подсветки) или -1, если не попала в топ. Одинаковые
+        // имена допускаются: в топе может быть несколько результатов
+        // одного игрока
         public int Add(string name, int score)
         {
             if (string.IsNullOrWhiteSpace(name) || score <= 0)
                 return -1;
 
-            string now = DateTime.Now.ToString("dd.MM.yy HH:mm");
-            int existing = Entries.FindIndex(e =>
-                string.Equals(e.Name, name, StringComparison.OrdinalIgnoreCase));
-            if (existing >= 0)
+            var entry = new ResultEntry
             {
-                if (score > Entries[existing].Score)
-                {
-                    Entries[existing].Score = score;
-                    Entries[existing].Date = now;
-                }
-            }
-            else
-            {
-                Entries.Add(new ResultEntry { Name = name.Trim(), Score = score, Date = now });
-            }
+                Name = name.Trim(),
+                Score = score,
+                Date = DateTime.Now.ToString("dd.MM.yy HH:mm")
+            };
+            Entries.Add(entry);
 
             SortAndTrim();
             Save();
             Changed?.Invoke();
-            return Entries.FindIndex(e =>
-                string.Equals(e.Name, name, StringComparison.OrdinalIgnoreCase) && e.Score == score);
+            return Entries.IndexOf(entry);
         }
 
         // очистка таблицы (кнопка в настройках, с подтверждением)
