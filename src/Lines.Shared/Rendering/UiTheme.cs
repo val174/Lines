@@ -1,4 +1,6 @@
+using System;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 
 namespace Lines.Shared.Rendering
 {
@@ -21,5 +23,16 @@ namespace Lines.Shared.Rendering
 
         // размер шарика относительно клетки (и стоячий, и летящий)
         public const float BallScale = 0.92f;
+
+        // масштаб интерфейса от меньшей стороны экрана: на телефоне
+        // (особенно в портрете) контролы заметно крупнее, в десктопном
+        // окне (~800x571) s ~= 1 - размеры прежние
+        public static float Scale(Viewport viewport) =>
+            MathHelper.Clamp(Math.Min(viewport.Width, viewport.Height) / 560f, 0.6f, 2.5f);
+
+        // смягчённый масштаб текста: на телефоне (s ~ 2) надписи
+        // примерно +30-50%, на десктопе (s ~ 1) почти без изменений
+        public static float TextScale(Viewport viewport) =>
+            1f + (Scale(viewport) - 1f) * 0.4f;
     }
 }

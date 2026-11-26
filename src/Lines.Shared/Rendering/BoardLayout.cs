@@ -24,10 +24,17 @@ namespace Lines.Shared.Rendering
         {
             bool portrait = viewport.Height > viewport.Width;
             int panelHeight = Math.Max(48, viewport.Height / 10);
-            int statusHeight = panelHeight; // нижняя панель - всегда
+            // в ландшафте нижняя панель выше (широкие кнопки с иконкой и
+            // подписью); место берётся из зазоров вокруг поля - само поле
+            // и верхняя панель размера не меняют. В портрете - как было
+            int statusHeight = portrait
+                ? panelHeight
+                : Math.Max(panelHeight, (int)(viewport.Height * 0.135f));
             // зазор между панелью и полем: рамка поля рисуется на 4px выше
             // начала поля, поэтому без явного зазора она перекрывает панель
-            int gap = Math.Max(8, panelHeight / 4);
+            int gap = portrait
+                ? Math.Max(8, panelHeight / 4)
+                : Math.Max(4, panelHeight / 10);
             int board = Math.Min(viewport.Width,
                 viewport.Height - panelHeight - statusHeight - gap * 2);
             int cell = Math.Max(1, board / mapSize);

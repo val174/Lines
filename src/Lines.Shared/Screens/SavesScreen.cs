@@ -9,12 +9,14 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace Lines.Shared.Screens
 {
-    // Экран сохранённых игр: сетка слотов (9 ручных + автосохранение),
-    // всегда в 2 строки по 5 ячеек. В ячейке - превью поля,
-    // счёт и дата. Две вкладки: «Загрузить» (тап по занятой ячейке
-    // загружает партию) и «Сохранить» (тап по пустой - сохраняет,
-    // по занятой - перезапись с подтверждением). Ячейка автосохранения
-    // вручную недоступна - она перезаписывается только автосохранением.
+    // Экран сохранённых игр: сетка слотов (9 ручных + автосохранение);
+    // в ландшафте 5 колонок x 2 строки, в портрете 2 колонки x 5 рядов.
+    // В ячейке - превью поля, счёт и дата. Режим задаётся при открытии
+    // (Open): кнопка «Сохранить» на панели игры - режим сохранения
+    // (тап по пустой ячейке сохраняет, по занятой - перезапись с
+    // подтверждением), «Загрузить» - режим загрузки (тап по занятой
+    // ячейке). Ячейка автосохранения вручную недоступна - она
+    // перезаписывается только автосохранением.
     public class SavesScreen : IScreen
     {
         private const float ConfirmSeconds = 4f;
@@ -65,7 +67,8 @@ namespace Lines.Shared.Screens
         }
 
         // открытие экрана в заданном режиме (кнопки «Сохранить»/
-        // «Загрузить» на панели игры ведут сразу в нужную вкладку)
+        // «Загрузить» на панели игры ведут сразу в нужный режим;
+        // переключения режима внутри экрана нет)
         public void Open(bool inSaveMode)
         {
             saveMode = inSaveMode;
@@ -92,18 +95,6 @@ namespace Lines.Shared.Screens
             if (l.BackButton.Contains(click))
             {
                 Back?.Invoke();
-                return;
-            }
-            if (l.LoadTab.Contains(click))
-            {
-                saveMode = false;
-                armedCell = -1;
-                return;
-            }
-            if (l.SaveTab.Contains(click))
-            {
-                saveMode = true;
-                armedCell = -1;
                 return;
             }
 
@@ -148,24 +139,22 @@ namespace Lines.Shared.Screens
         {
             Layout l = ComputeLayout(viewport);
             Strings t = Strings.Current;
+            float ts = UiTheme.TextScale(viewport); // крупнее текст на телефоне
 
-            DrawTitle(sb, viewport, l, t.SavedGames);
-            DrawButton(sb, l.LoadTab, t.Load,
-                !saveMode ? UiTheme.Confirm : UiTheme.PanelAlt);
-            DrawButton(sb, l.SaveTab, t.Save,
-                saveMode ? UiTheme.Confirm : UiTheme.PanelAlt);
+            // заголовок зависит от режима: «Сохранение» / «Загрузка»
+            DrawTitle(sb, viewport, l, saveMode ? t.SaveTitle : t.LoadTitle);
 
             bool canSave = canCapture?.Invoke() ?? false;
             EnsureLabels();
             for (int i = 0; i < SavesService.SlotCount; i++)
-                DrawCell(sb, l.Cells[i], i, canSave);
+                DrawCell(sb, l.Cells[i], i, canSave, ts);
 
             if (saveMode && !canSave)
                 DrawHint(sb, t.SaveHintBusy, viewport, l);
             else if (saveMode)
                 DrawHint(sb, t.SaveHintChoose, viewport, l);
 
-            DrawButton(sb, l.BackButton, t.Back, UiTheme.Neutral);
+            DrawButton(sb, l.BackButton, t.Back, UiTheme.Neutral, ts);
         }
 
         // --- раскладка ---
@@ -173,7 +162,6 @@ namespace Lines.Shared.Screens
         private struct Layout
         {
             public int TitleBand;
-            public Rectangle LoadTab, SaveTab;
             public Rectangle[] Cells;
             public int HintY;
             public Rectangle BackButton;
@@ -181,32 +169,34 @@ namespace Lines.Shared.Screens
 
         private static Layout ComputeLayout(Viewport viewport)
         {
+            float s = UiTheme.Scale(viewport);
             var l = new Layout { Cells = new Rectangle[SavesService.SlotCount] };
 
             l.TitleBand = Math.Max(52, viewport.Height / 11);
-            int tabH = Math.Max(40, viewport.Height / 16);
-            int tabW = Math.Min(220, viewport.Width / 3);
-            l.LoadTab = new Rectangle(viewport.Width / 2 - tabW - 6, l.TitleBand, tabW, tabH);
-            l.SaveTab = new Rectangle(viewport.Width / 2 + 6, l.TitleBand, tabW, tabH);
 
-            int backBand = Math.Max(70, viewport.Height / 8);
-            int backW = Math.Min(220, viewport.Width / 2);
-            int backH = Math.Min(52, backBand - 20);
+            // «Назад» крупная, как кнопки диалогов
+            int backBand = Math.Max((int)(70 * s), viewport.Height / 6);
+            int backW = Math.Min((int)(viewport.Width * 0.5f), (int)(320 * s));
+            int backH = Math.Min(viewport.Height / 12, backBand - 20);
             l.BackButton = new Rectangle((viewport.Width - backW) / 2,
                 viewport.Height - backBand + (backBand - backH) / 2, backW, backH);
 
-            int areaY = l.TitleBand + tabH + 12;
+            int areaY = l.TitleBand + 12;
             int hintH = Math.Max(24, viewport.Height / 28);
             l.HintY = areaY;
             areaY += hintH;
             int areaH = viewport.Height - backBand - areaY - 8;
 
-            // сетка всегда в 2 строки (5 колонок на 10 слотов),
-            // даже если экран позволяет больше колонок
+            // сетка: в ландшафте 5 колонок x 2 строки, в портрете -
+            // 2 колонки x 5 рядов (10 слотов: 9 ручных + автосейв)
             const int gap = 10;
-            int finalRows = 2;
+            bool portrait = viewport.Width < viewport.Height;
+            int finalRows = portrait ? 5 : 2;
             int cols = (SavesService.SlotCount + finalRows - 1) / finalRows;
-            int cellW = Math.Min(300, (viewport.Width - gap * (cols + 1)) / cols);
+            // в портрете ширина ячейки ограничена масштабированным
+            // потолком - на телефоне превью крупнее
+            int cellW = Math.Min(portrait ? (int)(300 * s) : 300,
+                (viewport.Width - gap * (cols + 1)) / cols);
             int cellH = (areaH - gap * (finalRows + 1)) / finalRows;
             cellH = Math.Min(cellH, cellW + 70); // превью квадратное + подпись
 
@@ -227,7 +217,8 @@ namespace Lines.Shared.Screens
 
         private void DrawTitle(SpriteBatch sb, Viewport viewport, Layout l, string title)
         {
-            SpriteFont sf = fonts.Pick(l.TitleBand * 0.5f / fonts.Base.LineSpacing, out float scale);
+            SpriteFont sf = fonts.Pick(l.TitleBand * 0.5f * UiTheme.TextScale(viewport)
+                / fonts.Base.LineSpacing, out float scale);
             scale = Math.Min(scale, viewport.Width * 0.8f / sf.MeasureString(title).X);
             Vector2 size = sf.MeasureString(title) * scale;
             sb.DrawString(sf, title,
@@ -255,7 +246,7 @@ namespace Lines.Shared.Screens
             }
         }
 
-        private void DrawCell(SpriteBatch sb, Rectangle cell, int index, bool canSave)
+        private void DrawCell(SpriteBatch sb, Rectangle cell, int index, bool canSave, float ts)
         {
             GameSave save = saves.Slots[index];
             bool isAuto = index == SavesService.AutoSlot;
@@ -279,14 +270,14 @@ namespace Lines.Shared.Screens
             if (save == null)
             {
                 DrawCenteredIn(sb, Strings.Current.EmptySlot, cell,
-                    dimmed ? Color.Gray * 0.6f : Color.Gray);
+                    dimmed ? Color.Gray * 0.6f : Color.Gray, ts);
                 return;
             }
 
             DrawPreview(sb, save, previewArea, dimmed);
 
             string label = cellLabels[index] ?? "";
-            SpriteFont sf = fonts.Pick(labelH * 0.62f / fonts.Base.LineSpacing, out float scale);
+            SpriteFont sf = fonts.Pick(labelH * 0.62f * ts / fonts.Base.LineSpacing, out float scale);
             scale = Math.Min(scale, (cell.Width - 12) / sf.MeasureString(label).X);
             Vector2 size = sf.MeasureString(label) * scale;
             Color labelColor = dimmed ? Color.White * 0.5f : Color.White;
@@ -312,7 +303,8 @@ namespace Lines.Shared.Screens
             }
 
             if (armedCell == index)
-                DrawCenteredIn(sb, Strings.Current.OverwritePrompt, previewArea, new Color(255, 150, 140));
+                DrawCenteredIn(sb, Strings.Current.OverwritePrompt, previewArea,
+                    new Color(255, 150, 140), ts);
         }
 
         // миниатюра поля 9x9: клетки с линиями сетки и шарики из сохранения
@@ -353,16 +345,16 @@ namespace Lines.Shared.Screens
 
         private void DrawHint(SpriteBatch sb, string text, Viewport viewport, Layout l)
         {
-            SpriteFont sf = fonts.Pick(0.7f, out float scale);
+            SpriteFont sf = fonts.Pick(0.7f * UiTheme.TextScale(viewport), out float scale);
             scale = Math.Min(scale, viewport.Width * 0.9f / sf.MeasureString(text).X);
             Vector2 size = sf.MeasureString(text) * scale;
             sb.DrawString(sf, text, new Vector2((viewport.Width - size.X) / 2f, l.HintY),
                 UiTheme.FooterText, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
         }
 
-        private void DrawCenteredIn(SpriteBatch sb, string text, Rectangle area, Color color)
+        private void DrawCenteredIn(SpriteBatch sb, string text, Rectangle area, Color color, float ts)
         {
-            SpriteFont sf = fonts.Pick(area.Height * 0.12f / fonts.Base.LineSpacing, out float scale);
+            SpriteFont sf = fonts.Pick(area.Height * 0.12f * ts / fonts.Base.LineSpacing, out float scale);
             scale = Math.Min(scale, area.Width * 0.85f / sf.MeasureString(text).X);
             Vector2 size = sf.MeasureString(text) * scale;
             sb.DrawString(sf, text,
@@ -370,13 +362,13 @@ namespace Lines.Shared.Screens
                 color, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
         }
 
-        private void DrawButton(SpriteBatch sb, Rectangle rect, string text, Color back)
+        private void DrawButton(SpriteBatch sb, Rectangle rect, string text, Color back, float ts)
         {
             sb.Draw(pixel, rect, back);
             sb.Draw(pixel, new Rectangle(rect.X, rect.Y, rect.Width, 2), Color.White * 0.25f);
             sb.Draw(pixel, new Rectangle(rect.X, rect.Bottom - 2, rect.Width, 2), Color.Black * 0.3f);
 
-            SpriteFont sf = fonts.Pick(rect.Height * 0.45f / fonts.Base.LineSpacing, out float scale);
+            SpriteFont sf = fonts.Pick(rect.Height * 0.45f * ts / fonts.Base.LineSpacing, out float scale);
             scale = Math.Min(scale, rect.Width * 0.9f / sf.MeasureString(text).X);
             Vector2 size = sf.MeasureString(text) * scale;
             sb.DrawString(sf, text, new Vector2(rect.X + (rect.Width - size.X) / 2f,
